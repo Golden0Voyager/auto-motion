@@ -140,6 +140,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
         <div class="step-header"><span class="step-num">1</span> 扩写提示词</div>
         <div class="step-body">
           <div class="step-original" id="step-original-text"></div>
+          <div class="progress-bar" style="margin:6px 0"><div class="progress-bar-fill" id="card-progress" style="width:0%"></div></div>
           <div class="step-divider">↓</div>
           <div class="step-expanded" id="step-expanded-text"></div>
         </div>
@@ -151,13 +152,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
         </div>
       </div>
       <div class="step-card" data-step="3">
-        <div class="step-header"><span class="step-num">3</span> 生成图像</div>
-        <div class="step-body" style="padding:4px 0">
-          <div class="progress-bar"><div class="progress-bar-fill" id="card-progress" style="width:0%"></div></div>
-        </div>
-      </div>
-      <div class="step-card" data-step="4">
-        <div class="step-header"><span class="step-num">4</span> 抽卡结果</div>
+        <div class="step-header"><span class="step-num">3</span> 抽卡结果</div>
         <div class="step-body" id="step-result-body"></div>
       </div>
     </div>
@@ -399,8 +394,17 @@ vidBtn.addEventListener("click", async () => {
     document.getElementById("card-templates").classList.add("hidden");
     document.getElementById("card-steps").classList.remove("hidden");
 
+    // Step 1: 显示原始 prompt，进度条在 API 请求期间前进
     showStep(1);
     document.getElementById("step-original-text").textContent = subject;
+    const bar = document.getElementById("card-progress");
+    let apiDone = false;
+    let progressTimer = setInterval(() => {
+      const cur = parseFloat(bar.style.width) || 0;
+      if (cur < 90 && !apiDone) {
+        bar.style.width = `${Math.min(cur + (90 - cur) * 0.06, 90)}%`;
+      }
+    }, 400);
 
     const resp = await fetch("/api/optimize", {
       method: "POST",
@@ -411,18 +415,22 @@ vidBtn.addEventListener("click", async () => {
       }),
     });
     const data = await resp.json();
+    apiDone = true;
+    clearInterval(progressTimer);
+    bar.style.width = "100%";
 
+    // 等待 500ms 让 100% 显示一下，然后开始打字机
+    await new Promise(r => setTimeout(r, 500));
     const expanded = data.expanded || subject;
     typewriterEffect("step-expanded-text", expanded, () => {
+      // Step 2: 参数配置
       setTimeout(() => { showStep(2); renderParams(data.params || {}); }, 300);
+      // Step 3: 结果（跳过独立的进度条步骤）
       setTimeout(() => {
         showStep(3);
-        animateProgress(() => {
-          showStep(4);
-          renderResult(data, resp.ok);
-          document.getElementById("card-draw-btn").disabled = false;
-        });
-      }, 800);
+        renderResult(data, resp.ok);
+        document.getElementById("card-draw-btn").disabled = false;
+      }, 600);
     });
   }
 
@@ -458,17 +466,6 @@ vidBtn.addEventListener("click", async () => {
     grid.innerHTML = Object.entries(params).map(([k, v]) =>
       `<div class="param-item"><span class="param-label">${k}</span><span class="param-value">${v}</span></div>`
     ).join("");
-  }
-
-  function animateProgress(cb) {
-    const bar = document.getElementById("card-progress");
-    if (!bar) { if (cb) cb(); return; }
-    let pct = 0;
-    const timer = setInterval(() => {
-      pct += Math.random() * 8 + 2;
-      if (pct >= 100) { pct = 100; clearInterval(timer); if (cb) cb(); }
-      bar.style.width = `${Math.min(pct, 100)}%`;
-    }, 120);
   }
 
   function renderResult(data, ok) {
