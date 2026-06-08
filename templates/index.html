@@ -92,17 +92,20 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
     </div>
     <div id="img-result" class="result-area hidden"></div>
 
+    <!-- 模型选择（始终可见） -->
+    <div class="model-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <label style="font-size:13px;font-weight:500;color:#6e6e73;margin:0">模型</label>
+      <select id="img-model" style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff">
+        <option value="agnes-image-2.1-flash">agnes-image-2.1-flash (Agnes)</option>
+        <option value="sensenova-u1-fast">sensenova-u1-fast (SenseNova)</option>
+      </select>
+      <span id="img-model-badge" style="font-size:11px;padding:3px 10px;background:#0071e3;color:#fff;border-radius:10px;white-space:nowrap">Agnes</span>
+    </div>
+
     <div class="advanced-toggle" id="img-advanced-toggle">
       <span class="chevron">▶</span> 高级选项
     </div>
     <div class="advanced-content" id="img-advanced">
-      <div class="form-group">
-        <label>模型</label>
-        <select id="img-model">
-          <option value="agnes-image-2.1-flash">agnes-image-2.1-flash (Agnes)</option>
-          <option value="sensenova-u1-fast">sensenova-u1-fast (SenseNova)</option>
-        </select>
-      </div>
       <div class="form-row">
         <div class="form-group">
           <label>尺寸</label>
@@ -209,6 +212,10 @@ const imgSizeHints = {
   "agnes-image-2.1-flash": "推荐: 1024x768, 1152x768, 1344x768",
   "sensenova-u1-fast": "默认 2752x1536。支持: 1664x2496, 2496x1664, 1760x2368, 2368x1760, 1824x2272, 2272x1824, 2048x2048, 2752x1536, 1536x2752, 3072x1376, 1344x3136",
 };
+const imgModelLabels = {
+  "agnes-image-2.1-flash": "Agnes",
+  "sensenova-u1-fast": "SenseNova",
+};
 document.getElementById("img-model").addEventListener("change", function() {
   document.getElementById("img-size-hint").textContent = imgSizeHints[this.value] || "";
   const sizeInput = document.getElementById("img-size");
@@ -219,6 +226,12 @@ document.getElementById("img-model").addEventListener("change", function() {
   if (modelDefaults[this.value]) {
     sizeInput.value = modelDefaults[this.value];
   }
+  // 更新模型徽标和按钮
+  const label = imgModelLabels[this.value] || this.value;
+  const badge = document.getElementById("img-model-badge");
+  if (badge) badge.textContent = label;
+  const btn = document.getElementById("img-btn");
+  if (btn) btn.textContent = label === "SenseNova" ? "🔄 生成图像 (SenseNova)" : "🔄 生成图像";
 });
 
 async function api(url, body) {
