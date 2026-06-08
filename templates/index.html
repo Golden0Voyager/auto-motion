@@ -49,7 +49,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
 .tab-bar .tab { padding:6px 14px; border-radius:16px; border:1px solid #d2d2d7; background:#fff; font-size:13px; cursor:pointer; transition:all 0.2s; }
 .tab-bar .tab:hover { border-color:#0071e3; color:#0071e3; }
 .tab-bar .tab.active { background:#0071e3; color:#fff; border-color:#0071e3; }
-.template-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; margin-bottom:12px; }
+.template-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:12px; }
 .template-card { border:2px solid #e8e8ed; border-radius:10px; padding:12px; cursor:pointer; transition:all 0.2s; }
 .template-card:hover { border-color:#0071e3; transform:translateY(-2px); box-shadow:0 2px 8px rgba(0,0,0,0.06); }
 .template-card.selected { border-color:#0071e3; background:#f0f7ff; }
@@ -83,6 +83,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
 .img-tab:hover { color:#1d1d1f; background:#f0f0f2; }
 .img-tab.active { color:#fff; background:#0071e3; }
 .img-tab-content { transition:opacity 0.2s; }
+.model-bar { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.model-bar label { font-size:13px; font-weight:500; color:#6e6e73; margin:0; white-space:nowrap; }
+.model-bar select { flex:1; max-width:280px; padding:6px 10px; border:1px solid #d2d2d7; border-radius:8px; font-size:13px; background:#fff; }
+.model-bar .badge { font-size:11px; padding:3px 10px; background:#0071e3; color:#fff; border-radius:10px; white-space:nowrap; }
+.model-bar .badge.muted { background:#6e6e73; }
+.model-bar .note { font-size:11px; color:#aeaeb2; }
 </style>
 </head>
 <body>
@@ -102,13 +108,13 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
         <textarea id="img-prompt" placeholder="输入图像描述..." rows="3"></textarea>
       </div>
       <div id="img-result" class="result-area hidden"></div>
-      <div class="model-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <label style="font-size:13px;font-weight:500;color:#6e6e73;margin:0">模型</label>
-        <select id="img-model" style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff">
+      <div class="model-bar">
+        <label>模型</label>
+        <select id="img-model">
           <option value="agnes-image-2.1-flash">agnes-image-2.1-flash (Agnes)</option>
           <option value="sensenova-u1-fast">sensenova-u1-fast (SenseNova)</option>
         </select>
-        <span id="img-model-badge" style="font-size:11px;padding:3px 10px;background:#0071e3;color:#fff;border-radius:10px;white-space:nowrap">Agnes</span>
+        <span class="badge" id="img-model-badge">Agnes</span>
       </div>
       <div class="btn-group">
         <button class="btn" id="img-btn">🔄 生成图像</button>
@@ -140,8 +146,18 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
       <div id="card-templates">
         <div class="tab-bar" id="card-tabs"></div>
         <div class="template-grid" id="card-grid"></div>
+        <!-- 抽卡模型选择 -->
+        <div class="model-bar">
+          <label>模型</label>
+          <select id="card-model" disabled>
+            <option value="sensenova-u1-fast">sensenova-u1-fast (SenseNova)</option>
+            <option value="agnes-image-2.1-flash">agnes-image-2.1-flash (Agnes)</option>
+          </select>
+          <span class="badge muted" id="card-model-badge">默认</span>
+          <span class="note" id="card-model-note"></span>
+        </div>
         <div class="form-group">
-          <textarea id="card-subject" placeholder="选一个模版，然后在这里输入主体描述..." rows="2"></textarea>
+          <textarea id="card-subject" placeholder="先选一个模版..." rows="2"></textarea>
         </div>
         <div class="btn-group" style="justify-content:space-between">
           <span id="card-tip" style="font-size:12px;color:#8e8e93;align-self:center"></span>
@@ -408,10 +424,33 @@ vidBtn.addEventListener("click", async () => {
         state.selectedTemplate = tpl;
         document.getElementById("card-subject").placeholder = `已选「${tpl.name}」，输入主体描述...`;
         document.getElementById("card-tip").textContent = `已选: ${tpl.icon||"📄"} ${tpl.name}`;
+        // 自动设置模型选择器为模版推荐模型
+        applyTemplateModel(tpl);
         checkCanDraw();
       });
     });
   }
+
+  function applyTemplateModel(tpl) {
+    const sel = document.getElementById("card-model");
+    const badge = document.getElementById("card-model-badge");
+    const note = document.getElementById("card-model-note");
+    if (!sel || !tpl) return;
+    sel.value = tpl.params?.model || "sensenova-u1-fast";
+    sel.disabled = false;
+    if (badge) {
+      badge.textContent = tpl.params?.model === "agnes-image-2.1-flash" ? "Agnes" : "SenseNova";
+      badge.classList.remove("muted");
+    }
+    if (note) note.textContent = `建议尺寸: ${tpl.params?.size || "2048x2048"}`;
+  }
+
+  // 手动切换模型时，更新徽标和提示
+  document.getElementById("card-model")?.addEventListener("change", function() {
+    const badge = document.getElementById("card-model-badge");
+    if (!badge) return;
+    badge.textContent = this.value === "agnes-image-2.1-flash" ? "Agnes" : "SenseNova";
+  });
 
   function checkCanDraw() {
     const btn = document.getElementById("card-draw-btn");
@@ -440,32 +479,48 @@ vidBtn.addEventListener("click", async () => {
       }
     }, 400);
 
-    const resp = await fetch("/api/optimize", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        template_id: state.selectedTemplate.id,
-        subject: subject,
-      }),
-    });
-    const data = await resp.json();
-    apiDone = true;
-    clearInterval(progressTimer);
-    bar.style.width = "100%";
+    const model = document.getElementById("card-model").value;
+    let data;
+    try {
+      const resp = await fetch("/api/optimize", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          template_id: state.selectedTemplate.id,
+          subject: subject,
+          model: model,
+        }),
+      });
+      data = await resp.json();
+      apiDone = true;
+      bar.style.width = "100%";
 
-    // 等待 500ms 让 100% 显示一下，然后开始打字机
-    await new Promise(r => setTimeout(r, 500));
-    const expanded = data.expanded || subject;
-    typewriterEffect("step-expanded-text", expanded, () => {
-      // Step 2: 参数配置
-      setTimeout(() => { showStep(2); renderParams(data.params || {}); }, 300);
-      // Step 3: 结果（跳过独立的进度条步骤）
-      setTimeout(() => {
-        showStep(3);
-        renderResult(data, resp.ok);
-        document.getElementById("card-draw-btn").disabled = false;
-      }, 600);
-    });
+      // 等待 500ms 让 100% 显示一下，然后开始打字机
+      await new Promise(r => setTimeout(r, 500));
+      const expanded = data.expanded || subject;
+      typewriterEffect("step-expanded-text", expanded, () => {
+        // Step 2: 参数配置
+        setTimeout(() => { showStep(2); renderParams(data.params || {}); }, 300);
+        // Step 3: 结果
+        setTimeout(() => {
+          showStep(3);
+          renderResult(data, resp.ok);
+          document.getElementById("card-draw-btn").disabled = false;
+        }, 600);
+      });
+    } catch (e) {
+      apiDone = true;
+      bar.style.width = "100%";
+      data = { error: e.message || "网络请求失败" };
+      await new Promise(r => setTimeout(r, 300));
+      showStep(2);
+      renderParams({});
+      showStep(3);
+      renderResult(data, false);
+      document.getElementById("card-draw-btn").disabled = false;
+    } finally {
+      clearInterval(progressTimer);
+    }
   }
 
   function showStep(n) {
