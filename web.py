@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,110 @@ SENSENOVA_VALID_SIZES = {
     "2752x1536", "1536x2752", "3072x1376", "1344x3136",
 }
 SENSENOVA_DEFAULT_SIZE = "2752x1536"
+
+
+@dataclass
+class PromptTemplate:
+    id: str
+    category: str
+    icon: str
+    name: str
+    desc: str
+    template: str
+    params: dict
+
+
+CARD_TEMPLATES: list[PromptTemplate] = [
+    PromptTemplate(
+        id="portrait_01",
+        category="人像摄影",
+        icon="🧑",
+        name="温暖光影肖像",
+        desc="自然光下的环境人像，肤色通透、眼神生动",
+        template="Close portrait of {subject}, textured skin, gentle smile, "
+        "warm natural light, emotional documentary look. The portrait should feel "
+        "polished and natural, with sharp eyes, realistic skin texture, accurate "
+        "facial anatomy, and premium lighting that keeps the face as the main focus.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    PromptTemplate(
+        id="portrait_02",
+        category="人像摄影",
+        icon="🧑",
+        name="街头纪实",
+        desc="都市环境中抓拍，真实情绪与质感",
+        template="Documentary-style portrait of {subject} in an urban environment, "
+        "natural light, candid moment, gritty texture, emotional realism, "
+        "street photography aesthetic with sharp facial details.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    PromptTemplate(
+        id="landscape_01",
+        category="自然风光",
+        icon="🌄",
+        name="日落山川",
+        desc="金色时刻的广阔山川，浪漫氛围",
+        template="{subject} stretching to the horizon under a pastel sunset, "
+        "highly detailed foreground, romantic countryside scene, golden hour "
+        "lighting with soft warm tones, ultra-realistic depth.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
+    PromptTemplate(
+        id="landscape_02",
+        category="自然风光",
+        icon="🌄",
+        name="风暴海岸",
+        desc="戏剧化的海浪与天空，自然力量",
+        template="Stormy seascape with {subject}, dramatic sky with dark clouds, "
+        "realistic water motion and foam, moody coastal photography, "
+        "ultra-detailed waves crashing against rocks.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
+    PromptTemplate(
+        id="cyberpunk_01",
+        category="赛博朋克",
+        icon="🌆",
+        name="霓虹之夜",
+        desc="霓虹闪烁的城市夜景，赛博朋克美学",
+        template="A futuristic cyberpunk scene of {subject}, neon-lit cityscape, "
+        "rain-slicked streets reflecting holographic billboards, "
+        "purple and cyan lighting, cinematic composition, Blade Runner aesthetic.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
+    PromptTemplate(
+        id="infographic_01",
+        category="信息图",
+        icon="📊",
+        name="科技报告风",
+        desc="现代科技感的数据信息图",
+        template="This infographic about {subject} uses a modern tech style. "
+        "Clean grid layout, dark background with neon accent colors, "
+        "data charts and diagrams, professional typography, high information density.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    PromptTemplate(
+        id="watercolor_01",
+        category="水彩插画",
+        icon="🎨",
+        name="清新手绘",
+        desc="柔和水彩风格，梦幻清新的插画感",
+        template="Watercolor illustration of {subject}, soft pastel colors, "
+        "gentle brush strokes, artistic and dreamy style, white background "
+        "with subtle paper texture, delicate details.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    PromptTemplate(
+        id="retro_01",
+        category="复古档案",
+        icon="🏛️",
+        name="旧纸档案",
+        desc="做旧纸张质感，复古历史风格",
+        template="Create an archival-style document about {subject} in sepia "
+        "and parchment tones, distressed edges, vintage typography, "
+        "historical aesthetic, aged paper texture, 19th century document feel.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+]
 
 
 def _download_and_save(url: str, suffix: str = ".png") -> str:
@@ -129,6 +234,11 @@ async def _sensenova_generate_image(
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/templates")
+def api_templates():
+    return jsonify({"templates": [asdict(t) for t in CARD_TEMPLATES]})
 
 
 @app.route("/api/image", methods=["POST"])
