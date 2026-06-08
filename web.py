@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from src.log import RunLog
 from src.models import ImageRequest, VideoCreateRequest
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path("output")
 SENSENOVA_BASE_URL = "https://token.sensenova.cn/v1"
@@ -128,6 +130,111 @@ CARD_TEMPLATES: list[PromptTemplate] = [
         "historical aesthetic, aged paper texture, 19th century document feel.",
         params={"model": "sensenova-u1-fast", "size": "2048x2048"},
     ),
+    # --- 第二批次：美食摄影 ---
+    PromptTemplate(
+        id="food_01",
+        category="美食摄影",
+        icon="🍜",
+        name="精致料理",
+        desc="精致的摆盘与柔光，美食杂志质感",
+        template="Plated {subject} on a ceramic plate, soft natural window lighting "
+        "from the left, shallow depth of field, garnished with fresh herbs, "
+        "fine dining presentation, warm neutral background, macro food photography, "
+        "sharp focus on the main dish, creamy bokeh background, appetizing and vibrant.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    PromptTemplate(
+        id="food_02",
+        category="美食摄影",
+        icon="🍜",
+        name="烘焙甜点",
+        desc="新鲜出炉的甜点面包，温暖治愈",
+        template="{subject} fresh from the oven, steam rising gently, "
+        "golden brown crust with delicate caramelization, rustic wooden table, "
+        "soft morning light dusted with flour, warm and cozy bakery atmosphere, "
+        "detailed texture close-up, tempting and delicious, homestyle comfort.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    # --- 第三批次：动漫风格 ---
+    PromptTemplate(
+        id="anime_01",
+        category="动漫风格",
+        icon="🌸",
+        name="吉卜力田园",
+        desc="宫崎骏动画风格的田园风景，温暖治愈",
+        template="Studio Ghibli style illustration of {subject}, soft watercolor-inspired "
+        "backgrounds, warm pastel colors, lush greenery, gentle sunlight filtering "
+        "through leaves, whimsical and nostalgic atmosphere, hand-drawn anime aesthetic, "
+        "detailed natural elements, Miyazaki-inspired, peaceful and dreamy.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
+    # --- 第四批次：3D 渲染 ---
+    PromptTemplate(
+        id="render_01",
+        category="3D 渲染",
+        icon="🧸",
+        name="皮克斯风格",
+        desc="皮克斯/迪士尼风格 3D 角色，生动有趣",
+        template="Pixar-style 3D render of {subject}, highly detailed character design, "
+        "soft global illumination, vibrant saturated colors, volumetric lighting, "
+        "subsurface scattering on skin, toy story aesthetic, smooth rounded surfaces, "
+        "playful and expressive, cinematic depth of field, 8k quality render.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    # --- 第五批次：建筑空间 ---
+    PromptTemplate(
+        id="architecture_01",
+        category="建筑空间",
+        icon="🏛️",
+        name="现代建筑",
+        desc="极简主义建筑摄影，线条与光影之美",
+        template="Modern architectural photography of {subject}, clean geometric lines, "
+        "minimalist composition, natural light casting dramatic shadows, "
+        "glass and concrete materials, blue hour sky, wide angle lens, "
+        "sharp architectural details, Architectural Digest style, "
+        "symmetrical framing, elegant urban design.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
+    PromptTemplate(
+        id="interior_01",
+        category="建筑空间",
+        icon="🏛️",
+        name="温馨室内",
+        desc="柔和光线的室内空间，北欧/日式氛围",
+        template="Cozy interior design of {subject}, warm ambient lighting, "
+        "natural materials like wood and linen, neutral color palette with "
+        "accent plants, hygge atmosphere, soft shadows, inviting and peaceful, "
+        "interior design magazine photography, clean uncluttered spaces.",
+        params={"model": "sensenova-u1-fast", "size": "2048x2048"},
+    ),
+    # --- 第六批次：科幻太空 ---
+    PromptTemplate(
+        id="sci-fi_01",
+        category="科幻太空",
+        icon="🚀",
+        name="深空探索",
+        desc="宇宙深空场景，宏大壮丽的科幻美学",
+        template="Epic sci-fi scene of {subject}, deep space background with "
+        "colorful nebulae and distant stars, dramatic volumetric lighting, "
+        "highly detailed spacecraft or cosmic structures, immense scale, "
+        "cinematic composition, realistic physics-based rendering, "
+        "awe-inspiring vista, Interstellar aesthetic.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
+    # --- 第七批次：中国风 ---
+    PromptTemplate(
+        id="inkwash_01",
+        category="中国风",
+        icon="🖌️",
+        name="水墨意境",
+        desc="传统水墨画风格，留白与写意的东方美学",
+        template="Traditional Chinese ink wash painting of {subject}, sumi-e style, "
+        "loose flowing brushstrokes, black ink on rice paper with subtle gray washes, "
+        "expressive negative space, poetic and minimalist composition, "
+        "misty mountains or bamboo aesthetic, oriental elegance, hand-painted feel, "
+        "artistic brushwork with ink bleeding effects.",
+        params={"model": "sensenova-u1-fast", "size": "2752x1536"},
+    ),
 ]
 
 
@@ -187,7 +294,8 @@ async def _expand_prompt(settings: Settings, prompt: str) -> str:
         )
         expanded = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         return expanded.strip() or prompt
-    except Exception:
+    except Exception as e:
+        logger.warning("prompt 扩写失败: %s", e)
         return prompt
 
 
@@ -266,12 +374,18 @@ def api_optimize():
         final_prompt = subject
         params = {"model": "sensenova-u1-fast", "size": "2048x2048"}
 
+    # 允许用户覆盖 model / size
+    if data.get("model"):
+        params["model"] = data["model"]
+    if data.get("size"):
+        params["size"] = data["size"]
+
     # Step 1: 扩写
     expanded = final_prompt
     try:
         expanded = asyncio.run(_expand_prompt(settings, final_prompt))
-    except Exception:
-        pass  # 扩写失败则使用原 prompt
+    except Exception as e:
+        logger.warning("扩写阶段出错，使用原 prompt: %s", e)
 
     # Step 2+3: 生成图像
     try:
