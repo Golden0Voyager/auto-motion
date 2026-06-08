@@ -241,6 +241,65 @@ def api_templates():
     return jsonify({"templates": [asdict(t) for t in CARD_TEMPLATES]})
 
 
+@app.route("/api/optimize", methods=["POST"])
+def api_optimize():
+    data = request.get_json()
+    if not data or not data.get("subject", "").strip():
+        return jsonify({"error": "缺少 subject"}), 400
+
+    settings = Settings.from_env()
+    subject = data["subject"].strip()
+    template_id = data.get("template_id")
+    custom_prompt = data.get("custom_prompt")
+
+    # 选择模版或使用自定义 prompt
+    if custom_prompt:
+        final_prompt = custom_prompt
+        params = {"model": "sensenova-u1-fast", "size": "2048x2048"}
+    elif template_id:
+        tpl = next((t for t in CARD_TEMPLATES if t.id == template_id), None)
+        if not tpl:
+            return jsonify({"error": f"模版 {template_id} 不存在"}), 400
+        final_prompt = tpl.template.replace("{subject}", subject)
+        params = dict(tpl.params)
+    else:
+        final_prompt = subject
+        params = {"model": "sensenova-u1-fast", "size": "2048x2048"}
+
+    # Step 1: 扩写
+    expanded = final_prompt
+    try:
+        expanded = asyncio.run(_expand_prompt(settings, final_prompt))
+    except Exception:
+        pass  # 扩写失败则使用原 prompt
+
+    # Step 2+3: 生成图像
+    try:
+        size = params.get("size", "2048x2048")
+        image_url = asyncio.run(_sensenova_generate_image(settings, expanded, size))
+        local_path = _download_and_save(image_url, ".png")
+        return jsonify({
+            "original": subject,
+            "expanded": expanded,
+            "params": params,
+            "url": local_path,
+            "original_url": image_url,
+            "model_used": params["model"],
+        })
+    except RuntimeError as e:
+        return jsonify({
+            "error": f"图像生成失败: {e}",
+            "expanded": expanded,
+            "step": "generating",
+        }), 502
+    except Exception as e:
+        return jsonify({
+            "error": f"未知错误: {e}",
+            "expanded": expanded,
+            "step": "generating",
+        }), 502
+
+
 @app.route("/api/image", methods=["POST"])
 def api_image():
     data = request.get_json()
