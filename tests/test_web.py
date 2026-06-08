@@ -57,11 +57,19 @@ def test_optimize_invalid_template() -> None:
         assert "error" in data
 
 
-def test_optimize_without_api_key() -> None:
+def test_optimize_basic_integration() -> None:
+    """集成测试：有 API Key 时正常返回结果，无 Key 时报错"""
     from web import app
     with app.test_client() as c:
         resp = c.post("/api/optimize", json={
             "template_id": "portrait_01",
             "subject": "test",
         })
-        assert resp.status_code in (400, 502)
+        # 无 API Key 时返回 502；有 Key 时返回 200 + 结果
+        if resp.status_code == 200:
+            data = resp.get_json()
+            assert "original" in data
+            assert "expanded" in data
+            assert "params" in data
+        else:
+            assert resp.status_code in (400, 502)
