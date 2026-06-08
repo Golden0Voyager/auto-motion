@@ -76,6 +76,13 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
 .result-actions { display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
 .result-actions .btn-sm { padding:6px 14px; background:#e8e8ed; color:#1d1d1f; border:none; border-radius:6px; font-size:12px; cursor:pointer; text-decoration:none; }
 .result-actions .btn-sm:hover { background:#d2d2d7; }
+
+/* 🖼️ 图像 Tab 切换 */
+.img-tab-bar { display:flex; gap:6px; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid #e8e8ed; }
+.img-tab { padding:6px 16px; border-radius:8px; font-size:14px; cursor:pointer; color:#6e6e73; transition:all 0.2s; }
+.img-tab:hover { color:#1d1d1f; background:#f0f0f2; }
+.img-tab.active { color:#fff; background:#0071e3; }
+.img-tab-content { transition:opacity 0.2s; }
 </style>
 </head>
 <body>
@@ -84,79 +91,83 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #0071e3
 
   <div class="card">
     <h2>🖼️ 图像生成</h2>
-    <div class="form-group">
-      <textarea id="img-prompt" placeholder="输入图像描述..." rows="3"></textarea>
-    </div>
-    <div class="btn-group">
-      <button class="btn" id="img-btn">🔄 生成图像</button>
-    </div>
-    <div id="img-result" class="result-area hidden"></div>
-
-    <!-- 模型选择（始终可见） -->
-    <div class="model-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <label style="font-size:13px;font-weight:500;color:#6e6e73;margin:0">模型</label>
-      <select id="img-model" style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff">
-        <option value="agnes-image-2.1-flash">agnes-image-2.1-flash (Agnes)</option>
-        <option value="sensenova-u1-fast">sensenova-u1-fast (SenseNova)</option>
-      </select>
-      <span id="img-model-badge" style="font-size:11px;padding:3px 10px;background:#0071e3;color:#fff;border-radius:10px;white-space:nowrap">Agnes</span>
+    <div class="img-tab-bar">
+      <span class="img-tab active" data-tab="quick">快速生成</span>
+      <span class="img-tab" data-tab="card">🎴 智能抽卡</span>
     </div>
 
-    <div class="advanced-toggle" id="img-advanced-toggle">
-      <span class="chevron">▶</span> 高级选项
-    </div>
-    <div class="advanced-content" id="img-advanced">
-      <div class="form-row">
-        <div class="form-group">
-          <label>尺寸</label>
-          <input id="img-size" value="1152x768">
-          <div class="size-hint" id="img-size-hint">推荐: 1024x768, 1152x768, 1344x768</div>
-        </div>
-        <div class="form-group">
-          <label>源图 URL</label>
-          <input id="img-source" placeholder="留空则文生图">
-        </div>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:8px">
-        <input id="img-expand" type="checkbox" style="width:auto">
-        <label for="img-expand" style="margin:0;cursor:pointer">扩写提示词（sensenova-6.7-flash-lite）</label>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ 🎴 智能抽卡 ============ -->
-  <div class="card" id="card-section">
-    <h2>🎴 智能抽卡</h2>
-    <div id="card-templates">
-      <div class="tab-bar" id="card-tabs"></div>
-      <div class="template-grid" id="card-grid"></div>
+    <!-- Tab: 快速生成 -->
+    <div class="img-tab-content" id="img-tab-quick">
       <div class="form-group">
-        <textarea id="card-subject" placeholder="选一个模版，然后在这里输入主体描述..." rows="2"></textarea>
+        <textarea id="img-prompt" placeholder="输入图像描述..." rows="3"></textarea>
       </div>
-      <div class="btn-group" style="justify-content:space-between">
-        <span id="card-tip" style="font-size:12px;color:#8e8e93;align-self:center"></span>
-        <button class="btn" id="card-draw-btn" disabled>🎴 开始抽卡</button>
+      <div id="img-result" class="result-area hidden"></div>
+      <div class="model-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <label style="font-size:13px;font-weight:500;color:#6e6e73;margin:0">模型</label>
+        <select id="img-model" style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff">
+          <option value="agnes-image-2.1-flash">agnes-image-2.1-flash (Agnes)</option>
+          <option value="sensenova-u1-fast">sensenova-u1-fast (SenseNova)</option>
+        </select>
+        <span id="img-model-badge" style="font-size:11px;padding:3px 10px;background:#0071e3;color:#fff;border-radius:10px;white-space:nowrap">Agnes</span>
+      </div>
+      <div class="btn-group">
+        <button class="btn" id="img-btn">🔄 生成图像</button>
+      </div>
+      <div class="advanced-toggle" id="img-advanced-toggle">
+        <span class="chevron">▶</span> 高级选项
+      </div>
+      <div class="advanced-content" id="img-advanced">
+        <div class="form-row">
+          <div class="form-group">
+            <label>尺寸</label>
+            <input id="img-size" value="1152x768">
+            <div class="size-hint" id="img-size-hint">推荐: 1024x768, 1152x768, 1344x768</div>
+          </div>
+          <div class="form-group">
+            <label>源图 URL</label>
+            <input id="img-source" placeholder="留空则文生图">
+          </div>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px">
+          <input id="img-expand" type="checkbox" style="width:auto">
+          <label for="img-expand" style="margin:0;cursor:pointer">扩写提示词（sensenova-6.7-flash-lite）</label>
+        </div>
       </div>
     </div>
-    <div id="card-steps" class="hidden">
-      <div class="step-card" data-step="1">
-        <div class="step-header"><span class="step-num">1</span> 扩写提示词</div>
-        <div class="step-body">
-          <div class="step-original" id="step-original-text"></div>
-          <div class="progress-bar" style="margin:6px 0"><div class="progress-bar-fill" id="card-progress" style="width:0%"></div></div>
-          <div class="step-divider">↓</div>
-          <div class="step-expanded" id="step-expanded-text"></div>
+
+    <!-- Tab: 智能抽卡 -->
+    <div class="img-tab-content hidden" id="img-tab-card">
+      <div id="card-templates">
+        <div class="tab-bar" id="card-tabs"></div>
+        <div class="template-grid" id="card-grid"></div>
+        <div class="form-group">
+          <textarea id="card-subject" placeholder="选一个模版，然后在这里输入主体描述..." rows="2"></textarea>
+        </div>
+        <div class="btn-group" style="justify-content:space-between">
+          <span id="card-tip" style="font-size:12px;color:#8e8e93;align-self:center"></span>
+          <button class="btn" id="card-draw-btn" disabled>🎴 开始抽卡</button>
         </div>
       </div>
-      <div class="step-card" data-step="2">
-        <div class="step-header"><span class="step-num">2</span> 参数配置</div>
-        <div class="step-body">
-          <div class="params-grid" id="step-params"></div>
+      <div id="card-steps" class="hidden">
+        <div class="step-card" data-step="1">
+          <div class="step-header"><span class="step-num">1</span> 扩写提示词</div>
+          <div class="step-body">
+            <div class="step-original" id="step-original-text"></div>
+            <div class="progress-bar" style="margin:6px 0"><div class="progress-bar-fill" id="card-progress" style="width:0%"></div></div>
+            <div class="step-divider">↓</div>
+            <div class="step-expanded" id="step-expanded-text"></div>
+          </div>
         </div>
-      </div>
-      <div class="step-card" data-step="3">
-        <div class="step-header"><span class="step-num">3</span> 抽卡结果</div>
-        <div class="step-body" id="step-result-body"></div>
+        <div class="step-card" data-step="2">
+          <div class="step-header"><span class="step-num">2</span> 参数配置</div>
+          <div class="step-body">
+            <div class="params-grid" id="step-params"></div>
+          </div>
+        </div>
+        <div class="step-card" data-step="3">
+          <div class="step-header"><span class="step-num">3</span> 抽卡结果</div>
+          <div class="step-body" id="step-result-body"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -207,6 +218,16 @@ function setupToggle(btnId, contentId) {
 }
 setupToggle("img-advanced-toggle", "img-advanced");
 setupToggle("vid-advanced-toggle", "vid-advanced");
+
+// 🖼️ 图像 Tab 切换
+document.querySelectorAll(".img-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".img-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    document.querySelectorAll(".img-tab-content").forEach(c => c.classList.add("hidden"));
+    document.getElementById(`img-tab-${tab.dataset.tab}`).classList.remove("hidden");
+  });
+});
 
 const imgSizeHints = {
   "agnes-image-2.1-flash": "推荐: 1024x768, 1152x768, 1344x768",
