@@ -17,12 +17,13 @@ def test_video_frames_rule() -> None:
     from src.models import VideoCreateRequest
 
     for n in (81, 121, 161, 241, 441):
-        v = VideoCreateRequest(prompt="x", num_frames=n)
+        VideoCreateRequest(prompt="x", num_frames=n)
         assert (n - 1) % 8 == 0, f"num_frames={n} 违反 8n+1 规则"
 
 
 def test_video_frames_validation_rejects_invalid() -> None:
     from pydantic import ValidationError
+
     from src.models import VideoCreateRequest
 
     try:
@@ -40,6 +41,7 @@ def test_video_frames_validation_rejects_invalid() -> None:
 
 def test_video_frame_rate_validation() -> None:
     from pydantic import ValidationError
+
     from src.models import VideoCreateRequest
 
     try:

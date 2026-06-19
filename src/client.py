@@ -37,7 +37,7 @@ class AgnesClient:
                     resp = await client.post(url, headers=self._headers, json=payload)
                     resp.raise_for_status()
                     return resp.json()
-                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as e:
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
                     if attempt == 2:
                         raise
                     await asyncio.sleep(2 ** attempt)
@@ -50,7 +50,7 @@ class AgnesClient:
                     resp = await client.get(url, headers=self._headers)
                     resp.raise_for_status()
                     return resp.json()
-                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as e:
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
                     if attempt == 2:
                         raise
                     await asyncio.sleep(2 ** attempt)
@@ -89,7 +89,7 @@ class AgnesClient:
                     resp.raise_for_status()
                     data = resp.json()
                     return VideoQueryResponse.model_validate(data)
-                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as e:
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
                     if attempt == 2:
                         raise
                     await asyncio.sleep(2 ** attempt)
@@ -102,7 +102,7 @@ class AgnesClient:
                     resp = await client.get(url, headers=self._headers)
                     resp.raise_for_status()
                     return VideoQueryResponse.model_validate(resp.json())
-                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as e:
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
                     if attempt == 2:
                         raise
                     await asyncio.sleep(2 ** attempt)
