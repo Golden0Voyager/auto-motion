@@ -3,12 +3,14 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 def test_web_imports() -> None:
     from web import app
     assert app is not None
     assert app.name == "web"
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 def test_index_route() -> None:
     from web import app
     with app.test_client() as c:
@@ -17,6 +19,7 @@ def test_index_route() -> None:
         assert b"auto_motion" in resp.data
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 def test_templates_route() -> None:
     from web import app
     with app.test_client() as c:
@@ -27,6 +30,7 @@ def test_templates_route() -> None:
         assert len(data["templates"]) >= 16
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 def test_templates_structure() -> None:
     from web import app
     with app.test_client() as c:
@@ -38,6 +42,7 @@ def test_templates_structure() -> None:
         assert "size" in t["params"]
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 def test_optimize_missing_subject() -> None:
     from web import app
     with app.test_client() as c:
@@ -47,6 +52,7 @@ def test_optimize_missing_subject() -> None:
         assert "error" in data
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 def test_optimize_invalid_template() -> None:
     from web import app
     with app.test_client() as c:
@@ -59,6 +65,7 @@ def test_optimize_invalid_template() -> None:
         assert "error" in data
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 @patch("web._download_and_save", return_value="/output/fake.png")
 @patch("web._sensenova_generate_image", return_value="https://fake.url/img.png")
 @patch("web._expand_prompt", return_value="expanded prompt for a young woman")
@@ -80,6 +87,7 @@ def test_optimize_with_template(mock_expand, mock_generate, mock_download) -> No
         assert data["model_used"] == "sensenova-u1-fast"
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 @patch("web._download_and_save", return_value="/output/fake.png")
 @patch("web._sensenova_generate_image", return_value="https://fake.url/img.png")
 @patch("web._expand_prompt", return_value="expanded prompt for a young woman")
@@ -100,6 +108,7 @@ def test_optimize_model_override(mock_expand, mock_generate, mock_download) -> N
         assert data["model_used"] == "agnes-image-2.1-flash"
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 @patch("web._download_and_save", return_value="/output/fake.png")
 @patch("web._sensenova_generate_image", return_value="https://fake.url/img.png")
 @patch("web._expand_prompt", return_value="A cat on a mat")
@@ -117,6 +126,7 @@ def test_optimize_custom_prompt(mock_expand, mock_generate, mock_download) -> No
         assert "cat" in data["expanded"]
 
 
+@patch.dict("os.environ", {"AGNES_API_KEY": "test-key"})
 @patch("web._download_and_save", return_value="/output/fake.png")
 @patch("web._sensenova_generate_image", side_effect=RuntimeError("API 配额用尽"))
 @patch("web._expand_prompt", return_value="expanded prompt")
