@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -239,7 +239,7 @@ CARD_TEMPLATES: list[PromptTemplate] = [
 
 
 def _download_and_save(url: str, suffix: str = ".png") -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     filename = f"{ts}-{uuid.uuid4().hex[:8]}{suffix}"
     dest = OUTPUT_DIR / filename
     asyncio.run(AgnesClient._download_to(url, dest))
