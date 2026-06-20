@@ -21,7 +21,7 @@ class Settings:
     output_dir: Path = Path("output")
 
     @classmethod
-    def from_env(cls, env_file: Path | None = None) -> "Settings":
+    def from_env(cls, env_file: Path | None = None) -> Settings:
         if env_file is None:
             env_file = Path.cwd() / ".env"
         if env_file.exists():
