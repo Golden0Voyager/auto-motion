@@ -215,7 +215,7 @@ class QwenImageParameters(BaseModel):
         try:
             w, h = (int(x) for x in v.split("*"))
         except ValueError:
-            raise ValueError(f"size 解析失败, 应为 宽*高 的整数, 得到 {v}")
+            raise ValueError(f"size 解析失败, 应为 宽*高 的整数, 得到 {v}") from None
         pixels = w * h
         if pixels < 512 * 512 or pixels > 2048 * 2048:
             raise ValueError(f"总像素需在 512*512 至 2048*2048 之间, 得到 {w}x{h}={pixels}")
