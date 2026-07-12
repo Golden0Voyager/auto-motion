@@ -5,10 +5,26 @@ import asyncio
 import sys
 from pathlib import Path
 
-from src.client import AgnesClient
+from src.client import AgnesClient, SeedanceClient
 from src.config import Settings
 from src.log import RunLog
-from src.models import ImageRequest, VideoCreateRequest
+from src.models import (
+    HappyHorseInput,
+    HappyHorseParameters,
+    HappyHorseRequest,
+    ImageRequest,
+    QwenImageInput,
+    QwenImageParameters,
+    QwenImageRequest,
+    SeedanceInput,
+    SeedanceMedia,
+    SeedanceParameters,
+    SeedanceRequest,
+    VideoCreateRequest,
+    WanInput,
+    WanParameters,
+    WanRequest,
+)
 
 
 def _print(msg: str) -> None:
@@ -184,6 +200,262 @@ def cmd_history(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_seedance(args: argparse.Namespace) -> int:
+    settings = _build_settings()
+    if not settings.seedance_api_key:
+        print("[配置错误] SEEDANCE_API_KEY 未配置", file=sys.stderr)
+        return 2
+
+    client = SeedanceClient(settings)
+    log = RunLog()
+
+    media: list[SeedanceMedia] | None = None
+    if args.ref_image:
+        media = [SeedanceMedia(type="reference_image", url=args.ref_image)]
+    if args.ref_video:
+        media = media or []
+        media.append(SeedanceMedia(type="reference_video", url=args.ref_video))
+    if args.ref_audio:
+        media = media or []
+        media.append(SeedanceMedia(type="reference_audio", url=args.ref_audio))
+
+    input_data = SeedanceInput(
+        prompt=args.prompt,
+        media=media if media else None,
+    )
+
+    params = SeedanceParameters(
+        generate_audio=args.audio,
+        ratio=args.ratio,
+        duration=args.duration,
+        resolution=args.resolution,
+        watermark=args.watermark,
+        seed=args.seed,
+        camera_fixed=args.camera_fixed,
+    )
+
+    req = SeedanceRequest(
+        model=args.model,
+        input=input_data,
+        parameters=params,
+    )
+
+    out_path = Path(args.output)
+    _print(f"[seedance] model={req.model} duration={params.duration}s ratio={params.ratio} res={params.resolution}")
+    _print(f"[seedance] prompt={args.prompt[:80]!r}")
+
+    def on_progress(status: str | None, pct: int | None) -> None:
+        _print(f"[seedance] 状态={status}")
+
+    result = await client.generate_video(req, out_path, on_progress=on_progress)
+
+    video_url = result.output.results[0] if result.output and result.output.results else "unknown"
+    usage_info = ""
+    if result.usage and result.usage.video_duration:
+        usage_info = f"  时长={result.usage.video_duration}s"
+
+    _print(f"[seedance] 已保存: {out_path}{usage_info}")
+    log.append("seedance", {
+        "model": req.model,
+        "prompt": args.prompt[:100],
+        "duration": params.duration,
+        "ratio": params.ratio,
+        "resolution": params.resolution,
+    }, {
+        "path": str(out_path),
+        "video_url": video_url,
+        "task_id": result.output.task_id if result.output else None,
+    })
+    return 0
+
+
+async def cmd_seedance_query(args: argparse.Namespace) -> int:
+    settings = _build_settings()
+    if not settings.seedance_api_key:
+        print("[配置错误] SEEDANCE_API_KEY 未配置", file=sys.stderr)
+        return 2
+
+    client = SeedanceClient(settings)
+    result = await client.query_task(args.task_id)
+
+    _print(f"任务 ID: {result.output.task_id if result.output else 'N/A'}")
+    _print(f"状态: {result.output.task_status if result.output else 'N/A'}")
+    if result.output and result.output.results:
+        _print(f"视频地址: {result.output.results[0]}")
+    if result.output and result.output.error_message:
+        _print(f"错误: {result.output.error_message}")
+    if result.usage:
+        _print(f"用量: {result.usage.model_dump()}")
+
+    return 0
+
+
+async def cmd_wan(args: argparse.Namespace) -> int:
+    settings = _build_settings()
+    if not settings.seedance_api_key:
+        print("[配置错误] SEEDANCE_API_KEY 未配置", file=sys.stderr)
+        return 2
+
+    client = SeedanceClient(settings)
+    log = RunLog()
+
+    input_data = WanInput(
+        prompt=args.prompt,
+        negative_prompt=args.negative_prompt,
+        audio_url=args.audio_url,
+    )
+    params = WanParameters(
+        resolution=args.resolution,
+        ratio=args.ratio,
+        duration=args.duration,
+        prompt_extend=args.prompt_extend if args.prompt_extend else None,
+        watermark=args.watermark,
+        seed=args.seed,
+    )
+    req = WanRequest(
+        model=args.model,
+        input=input_data,
+        parameters=params,
+    )
+
+    out_path = Path(args.output)
+    _print(f"[wan] model={req.model} duration={params.duration}s ratio={params.ratio} res={params.resolution}")
+    _print(f"[wan] prompt={args.prompt[:80]!r}")
+
+    def on_progress(status: str | None, pct: int | None) -> None:
+        _print(f"[wan] 状态={status}")
+
+    result = await client.generate_video(req, out_path, on_progress=on_progress)
+
+    video_url = result.output.results[0] if result.output and result.output.results else "unknown"
+    usage_info = ""
+    if result.usage and result.usage.video_duration:
+        usage_info = f"  时长={result.usage.video_duration}s"
+
+    _print(f"[wan] 已保存: {out_path}{usage_info}")
+    log.append("wan", {
+        "model": req.model,
+        "prompt": args.prompt[:100],
+        "duration": params.duration,
+        "ratio": params.ratio,
+        "resolution": params.resolution,
+    }, {
+        "path": str(out_path),
+        "video_url": video_url,
+        "task_id": result.output.task_id if result.output else None,
+    })
+    return 0
+
+
+async def cmd_happyhorse(args: argparse.Namespace) -> int:
+    settings = _build_settings()
+    if not settings.seedance_api_key:
+        print("[配置错误] SEEDANCE_API_KEY 未配置", file=sys.stderr)
+        return 2
+
+    client = SeedanceClient(settings)
+    log = RunLog()
+
+    input_data = HappyHorseInput(prompt=args.prompt)
+    params = HappyHorseParameters(
+        resolution=args.resolution,
+        ratio=args.ratio,
+        duration=args.duration,
+        watermark=args.watermark,
+        seed=args.seed,
+    )
+    req = HappyHorseRequest(
+        model=args.model,
+        input=input_data,
+        parameters=params,
+    )
+
+    out_path = Path(args.output)
+    _print(f"[happyhorse] model={req.model} duration={params.duration}s ratio={params.ratio} res={params.resolution}")
+    _print(f"[happyhorse] prompt={args.prompt[:80]!r}")
+
+    def on_progress(status: str | None, pct: int | None) -> None:
+        _print(f"[happyhorse] 状态={status}")
+
+    result = await client.generate_video(req, out_path, on_progress=on_progress)
+
+    video_url = result.output.results[0] if result.output and result.output.results else "unknown"
+    usage_info = ""
+    if result.usage and result.usage.video_duration:
+        usage_info = f"  时长={result.usage.video_duration}s"
+
+    _print(f"[happyhorse] 已保存: {out_path}{usage_info}")
+    log.append("happyhorse", {
+        "model": req.model,
+        "prompt": args.prompt[:100],
+        "duration": params.duration,
+        "ratio": params.ratio,
+        "resolution": params.resolution,
+    }, {
+        "path": str(out_path),
+        "video_url": video_url,
+        "task_id": result.output.task_id if result.output else None,
+    })
+    return 0
+
+
+async def cmd_qwen(args: argparse.Namespace) -> int:
+    settings = _build_settings()
+    if not settings.seedance_api_key:
+        print("[配置错误] SEEDANCE_API_KEY 未配置", file=sys.stderr)
+        return 2
+
+    client = SeedanceClient(settings)
+    log = RunLog()
+
+    size = args.size
+    if args.width and args.height:
+        size = f"{args.width}*{args.height}"
+
+    input_data = QwenImageInput(
+        prompt=args.prompt,
+        negative_prompt=args.negative_prompt,
+    )
+    params = QwenImageParameters(
+        size=size,
+        n=args.n,
+        negative_prompt=args.negative_prompt,
+        prompt_extend=args.prompt_extend,
+        watermark=args.watermark,
+        seed=args.seed,
+    )
+    req = QwenImageRequest(
+        model=args.model,
+        input=input_data,
+        parameters=params,
+    )
+
+    out_path = Path(args.output)
+    _print(f"[qwen] model={req.model} size={size} n={params.n} prompt_extend={params.prompt_extend}")
+    _print(f"[qwen] prompt={args.prompt[:80]!r}")
+
+    result = await client.generate_image(req, out_path)
+
+    urls = result.output.results if result.output and result.output.results else []
+    usage_info = ""
+    if result.usage and result.usage.resolution:
+        usage_info = f"  分辨率={result.usage.resolution} 张数={result.usage.image_count}"
+
+    _print(f"[qwen] 已保存: {out_path}{usage_info}")
+    log.append("qwen", {
+        "model": req.model,
+        "prompt": args.prompt[:100],
+        "size": size,
+        "n": params.n,
+        "prompt_extend": params.prompt_extend,
+    }, {
+        "path": str(out_path),
+        "urls": urls,
+        "task_id": result.output.task_id if result.output else None,
+    })
+    return 0
+
+
 def cli() -> None:
     parser = argparse.ArgumentParser(
         prog="auto_motion",
@@ -229,6 +501,69 @@ def cli() -> None:
     p_his = sub.add_parser("history", help="查看最近运行记录")
     p_his.add_argument("--n", type=int, default=10)
     p_his.set_defaults(func=cmd_history)
+
+    p_seed = sub.add_parser("seedance", help="Seedance 视频生成(文生视频/多模态)")
+    p_seed.add_argument("prompt", help="视频内容描述")
+    p_seed.add_argument("--model", default="Seedance2.0", help="模型名称,默认 Seedance2.0")
+    p_seed.add_argument("--ref-image", help="参考图 URL")
+    p_seed.add_argument("--ref-video", help="参考视频 URL")
+    p_seed.add_argument("--ref-audio", help="参考音频 URL")
+    p_seed.add_argument("--audio", action="store_true", help="生成同步声音")
+    p_seed.add_argument("--ratio", default="16:9", choices=["16:9", "9:16", "adaptive"], help="宽高比")
+    p_seed.add_argument("--duration", type=int, default=5, help="视频时长(4-15秒)")
+    p_seed.add_argument("--resolution", default="720p", choices=["480p", "720p", "1080p"], help="分辨率")
+    p_seed.add_argument("--watermark", action="store_true", help="添加水印")
+    p_seed.add_argument("--seed", type=int, help="随机种子")
+    p_seed.add_argument("--camera-fixed", action="store_true", help="固定摄像头")
+    p_seed.add_argument("--output", "-o", default="output/seedance_video.mp4", help="保存路径")
+    p_seed.set_defaults(func=cmd_seedance)
+
+    p_sq = sub.add_parser("seedance-query", help="查询 Seedance 任务状态")
+    p_sq.add_argument("task_id", help="任务 ID")
+    p_sq.set_defaults(func=cmd_seedance_query)
+
+    p_hh = sub.add_parser("happyhorse", help="HappyHorse 文生视频(HappyHorse-1.0-T2V)")
+    p_hh.add_argument("prompt", help="视频内容描述")
+    p_hh.add_argument("--model", default="HappyHorse-1.0-T2V", help="模型名称,默认 HappyHorse-1.0-T2V")
+    p_hh.add_argument("--ratio", default="16:9",
+                      choices=["16:9", "9:16", "1:1", "4:3", "3:4", "4:5", "5:4", "9:21", "21:9"],
+                      help="宽高比")
+    p_hh.add_argument("--duration", type=int, default=5, help="视频时长(3-15秒)")
+    p_hh.add_argument("--resolution", default="720p", choices=["720p", "1080p"], help="分辨率")
+    p_hh.add_argument("--watermark", action="store_true", dest="watermark", default=True, help="添加水印(默认添加)")
+    p_hh.add_argument("--no-watermark", action="store_false", dest="watermark", help="不添加水印")
+    p_hh.add_argument("--seed", type=int, help="随机种子")
+    p_hh.add_argument("--output", "-o", default="output/happyhorse_video.mp4", help="保存路径")
+    p_hh.set_defaults(func=cmd_happyhorse)
+
+    p_wan = sub.add_parser("wan", help="万相文生视频(Wan2.7-T2V)")
+    p_wan.add_argument("prompt", help="视频内容描述")
+    p_wan.add_argument("--model", default="Wan2.7-T2V", help="模型名称,默认 Wan2.7-T2V")
+    p_wan.add_argument("--negative-prompt", help="反向提示词")
+    p_wan.add_argument("--audio-url", help="音频文件 URL(用于音频驱动视频)")
+    p_wan.add_argument("--ratio", default="16:9", choices=["16:9", "9:16"], help="宽高比")
+    p_wan.add_argument("--duration", type=int, default=5, help="视频时长(2-15秒)")
+    p_wan.add_argument("--resolution", default="720p", choices=["480p", "720p", "1080p"], help="分辨率")
+    p_wan.add_argument("--prompt-extend", action="store_true", help="开启提示词扩展")
+    p_wan.add_argument("--watermark", action="store_true", help="添加水印")
+    p_wan.add_argument("--seed", type=int, help="随机种子")
+    p_wan.add_argument("--output", "-o", default="output/wan_video.mp4", help="保存路径")
+    p_wan.set_defaults(func=cmd_wan)
+
+    p_qwen = sub.add_parser("qwen", help="通义千问文生图(Qwen-Image-2.0)")
+    p_qwen.add_argument("prompt", help="图像描述")
+    p_qwen.add_argument("--model", default="Qwen-Image-2.0", help="模型名称,默认 Qwen-Image-2.0")
+    p_qwen.add_argument("--size", default="2048*2048", help="输出尺寸 宽*高,默认 2048*2048")
+    p_qwen.add_argument("--width", type=int, help="与 --height 组合覆盖 --size")
+    p_qwen.add_argument("--height", type=int, help="与 --width 组合覆盖 --size")
+    p_qwen.add_argument("--n", type=int, default=1, help="生成数量 1-6")
+    p_qwen.add_argument("--negative-prompt", help="反向提示词")
+    p_qwen.add_argument("--no-prompt-extend", action="store_false", dest="prompt_extend",
+                        help="关闭提示词扩展(默认开启)")
+    p_qwen.add_argument("--watermark", action="store_true", help="添加水印")
+    p_qwen.add_argument("--seed", type=int, help="随机种子")
+    p_qwen.add_argument("--output", "-o", default="output/qwen_image.png", help="保存路径")
+    p_qwen.set_defaults(func=cmd_qwen, prompt_extend=True)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

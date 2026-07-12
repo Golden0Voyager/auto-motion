@@ -14,6 +14,8 @@ class Settings:
     base_url: str
     host: str
     sensenova_api_key: str = ""
+    seedance_api_key: str = ""
+    seedance_base_url: str = "https://api.scnet.cn/api/llm/v1"
     image_model: str = "agnes-image-2.1-flash"
     video_model: str = "agnes-video-v2.0"
     poll_interval_sec: float = 5.0
@@ -36,9 +38,15 @@ class Settings:
         parsed = urlparse(base_url)
         host = f"{parsed.scheme}://{parsed.netloc}"
         sensenova_api_key = os.getenv("SENSENOVA_API_KEY", "").strip()
+        seedance_api_key = os.getenv("SEEDANCE_API_KEY", "").strip()
+        seedance_base_url = os.getenv(
+            "SEEDANCE_BASE_URL", "https://api.scnet.cn/api/llm/v1"
+        ).rstrip("/")
         return cls(
             api_key=api_key,
             base_url=base_url,
             host=host,
             sensenova_api_key=sensenova_api_key,
+            seedance_api_key=seedance_api_key,
+            seedance_base_url=seedance_base_url,
         )

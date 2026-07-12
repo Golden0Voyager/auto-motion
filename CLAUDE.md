@@ -23,11 +23,15 @@
 
 ```
 main.py (CLI 解析,asyncio.run)
-  └─ AgnesClient (src/client.py)
-      ├─ generate_image()        POST /v1/images/generations
-      ├─ create_video_task()     POST /v1/videos
-      ├─ query_video()           GET  /agnesapi?video_id=...
-      └─ generate_video()        异步轮询封装
+  ├─ AgnesClient (src/client.py)
+  │    ├─ generate_image()        POST /v1/images/generations
+  │    ├─ create_video_task()     POST /v1/videos
+  │    ├─ query_video()           GET  /agnesapi?video_id=...
+  │    └─ generate_video()        异步轮询封装
+  ├─ SeedanceClient (src/client.py)
+  │    ├─ generate_video()        POST /videos/generations (Seedance/HappyHorse/Wan)
+  │    ├─ query_task()            GET  /tasks/{task_id}
+  │    └─ generate_image()        POST /images/generations (Qwen-Image-2.0)
   ├─ Settings (src/config.py)   读 .env
   ├─ Pydantic Models            强类型请求/响应
   └─ RunLog (src/log.py)        data/runs.jsonl
@@ -41,15 +45,31 @@ uv run python main.py image ...      # 文生图
 uv run python main.py video ...      # 文生视频(异步)
 uv run python main.py animate ...    # 图生视频
 uv run python main.py history        # 运行历史
+uv run python main.py seedance ...      # Seedance 视频生成(多模态)
+uv run python main.py happyhorse ...    # HappyHorse 视频生成(文生视频,更高画质)
+uv run python main.py wan ...           # 万相视频生成(文生视频,支持反向提示词/音频)
+uv run python main.py qwen ...          # 通义千问文生图(Qwen-Image-2.0)
+uv run python main.py seedance-query <task_id>  # 查询 Seedance/HappyHorse/Wan 任务
 uv run pytest tests/                 # 冒烟测试
 ```
 
-## 🎯 模型规格(Agnes AI 当前主力)
+## 🎯 模型规格
+
+### Agnes AI
 
 | 模型 | 接口 | 关键约束 |
 |---|---|---|
 | `agnes-image-2.1-flash` | `POST /v1/images/generations` | `response_format` 必须放 `extra_body`;图生图用顶层 `image` |
 | `agnes-video-v2.0` | `POST /v1/videos` (异步) | `num_frames ≤ 441` 且满足 `8n+1`;`frame_rate 1-60` |
+
+### Seedance / HappyHorse / Wan (scnet.cn)
+
+| 模型 | 接口 | 关键约束 |
+|---|---|---|
+| `Seedance2.0` | `POST /videos/generations` (异步) | `duration 4-15秒`;支持文生视频/图生视频/多模态;ratio: adaptive/16:9/9:16 |
+| `HappyHorse-1.0-T2V` | `POST /videos/generations` (异步) | `duration 3-15秒`;纯文生视频;ratio: 9种(16:9/9:16/1:1/4:3/3:4/4:5/5:4/9:21/21:9) |
+| `Wan2.7-T2V` | `POST /videos/generations` (异步) | `duration 2-15秒`;支持 `negative_prompt`/`audio_url`/`prompt_extend`;ratio: 16:9/9:16 |
+| `Qwen-Image-2.0` | `POST /images/generations` (同步) | `size` 用 `宽*高`(如 `1024*1024`);`n` 1-6;`prompt_extend` 默认开;`watermark` 默认关;总像素 512²~2048² |
 
 详细参数与最佳实践见 `/Users/hainingyu/Code/docs/api/Agnes_AI_API_Report.md`。
 
@@ -66,6 +86,8 @@ uv run pytest tests/                 # 冒烟测试
 |---|---|---|
 | `AGNES_API_KEY` | ✅ | 从 [Agnes AI 控制台](https://agnes-ai.com/) 申请 |
 | `AGNES_BASE_URL` | ❌ | 默认 `https://apihub.agnes-ai.com/v1` |
+| `SEEDANCE_API_KEY` | seedance命令 | 从 [计算服务](https://www.scnet.cn/) 申请 |
+| `SEEDANCE_BASE_URL` | ❌ | 默认 `https://api.scnet.cn/api/llm/v1` |
 
 ## 🚫 严禁
 
