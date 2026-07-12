@@ -10,11 +10,17 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import BaseModel
 
 from .config import Settings
 from .models import (
     ImageRequest,
     ImageResponse,
+    QwenImageRequest,
+    QwenImageResponse,
+    SeedanceCreateResponse,
+    SeedanceRequest,
+    SeedanceTaskResponse,
     VideoCreateRequest,
     VideoCreateResponse,
     VideoQueryResponse,
@@ -224,3 +230,142 @@ class AgnesClient:
 
         encoded = base64.b64encode(data).decode("ascii")
         return f"data:{mime};base64,{encoded}"
+
+
+class SeedanceClient:
+    def __init__(self, settings: Settings) -> None:
+        self._base_url = settings.seedance_base_url
+        self._api_key = settings.seedance_api_key
+
+    def _get_headers(self, async_mode: bool = False) -> dict[str, str]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        if async_mode:
+            headers["X-MultiModal-Async"] = "true"
+        return headers
+
+    async def _post(self, path: str, payload: dict[str, Any], async_mode: bool = False) -> dict[str, Any]:
+        url = f"{self._base_url}{path}"
+        headers = self._get_headers(async_mode)
+        async with httpx.AsyncClient(timeout=120.0, proxy=None) as client:
+            for attempt in range(3):
+                try:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+                    return resp.json()
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(2 ** attempt)
+
+    async def _get(self, path: str) -> dict[str, Any]:
+        url = f"{self._base_url}{path}"
+        headers = self._get_headers()
+        async with httpx.AsyncClient(timeout=60.0, proxy=None) as client:
+            for attempt in range(3):
+                try:
+                    resp = await client.get(url, headers=headers)
+                    resp.raise_for_status()
+                    return resp.json()
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError):
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(2 ** attempt)
+
+    async def create_task(self, req: BaseModel) -> SeedanceCreateResponse:
+        payload = req.model_dump(exclude_none=True)
+        data = await self._post("/videos/generations", payload, async_mode=True)
+        return SeedanceCreateResponse.model_validate(data)
+
+    async def query_task(self, task_id: str) -> SeedanceTaskResponse:
+        data = await self._get(f"/tasks/{task_id}")
+        return SeedanceTaskResponse.model_validate(data)
+
+    async def cancel_task(self, task_id: str) -> dict[str, Any]:
+        url = f"{self._base_url}/tasks/{task_id}/cancel"
+        headers = self._get_headers()
+        async with httpx.AsyncClient(timeout=60.0, proxy=None) as client:
+            resp = await client.post(url, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+
+    async def generate_image(
+        self,
+        req: QwenImageRequest,
+        save_to: Path,
+    ) -> QwenImageResponse:
+        payload = req.model_dump(exclude_none=True)
+        data = await self._post("/images/generations", payload)
+        result = QwenImageResponse.model_validate(data)
+
+        if not result.output or not result.output.results:
+            raise RuntimeError(f"未返回图像地址: {result.model_dump()}")
+
+        results = result.output.results
+        if len(results) == 1:
+            await self._download_to(results[0], save_to)
+        else:
+            stem = save_to.stem
+            suffix = save_to.suffix or ".png"
+            parent = save_to.parent
+            for i, url in enumerate(results, start=1):
+                dest = parent / f"{stem}_{i}{suffix}"
+                await self._download_to(url, dest)
+        return result
+
+    async def generate_video(
+        self,
+        req: BaseModel,
+        save_to: Path,
+        *,
+        poll_interval: float = 5.0,
+        poll_timeout: float = 600.0,
+        on_progress: Any = None,
+    ) -> SeedanceTaskResponse:
+        task = await self.create_task(req)
+        if not task.output or not task.output.task_id:
+            raise RuntimeError(f"未返回 task_id: {task.model_dump()}")
+
+        task_id = task.output.task_id
+        deadline = time.monotonic() + poll_timeout
+        last: SeedanceTaskResponse | None = None
+
+        while time.monotonic() < deadline:
+            await asyncio.sleep(poll_interval)
+            last = await self.query_task(task_id)
+
+            if on_progress and last.output:
+                on_progress(last.output.task_status, None)
+
+            if last.output and last.output.task_status in ("succeeded", "failed", "cancelled"):
+                break
+
+        if last is None or not last.output:
+            raise RuntimeError("任务查询无响应")
+
+        if last.output.task_status == "failed":
+            raise RuntimeError(
+                f"视频任务失败: {last.output.error_message or last.output.error_code}"
+            )
+
+        if last.output.task_status != "succeeded":
+            raise RuntimeError(f"任务未完成, 状态={last.output.task_status}")
+
+        if not last.output.results:
+            raise RuntimeError("任务成功但未返回视频地址")
+
+        video_url = last.output.results[0]
+        await self._download_to(video_url, save_to)
+        return last
+
+    @staticmethod
+    async def _download_to(url: str, dest: Path) -> None:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        async with httpx.AsyncClient(timeout=300.0, follow_redirects=True, proxy=None) as client:
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                with dest.open("wb") as f:
+                    async for chunk in resp.aiter_bytes(chunk_size=64 * 1024):
+                        f.write(chunk)
