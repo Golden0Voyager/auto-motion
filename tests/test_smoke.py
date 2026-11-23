@@ -538,3 +538,128 @@ def test_image_request_regression() -> None:
     req = ImageRequest(prompt="a cat", size="1024x768")
     assert req.model == "agnes-image-2.1-flash"
     assert req.size == "1024x768"
+
+
+# ── MiniMax-H3 (scnet) model ─────────────────────────────────────────
+
+
+def test_minimax_h3_basic() -> None:
+    from src.models import MiniMaxH3Request
+
+    req = MiniMaxH3Request(input={"prompt": "a cat"})
+    assert req.model == "MiniMax-H3"
+    assert req.input.prompt == "a cat"
+    assert req.parameters.resolution == "2K"
+    assert req.parameters.duration == 5
+    assert req.parameters.ratio == "16:9"
+    assert req.parameters.watermark is False
+
+
+def test_minimax_h3_accepts_valid_duration() -> None:
+    from src.models import MiniMaxH3Parameters
+
+    for d in (4, 5, 10, 15):
+        p = MiniMaxH3Parameters(duration=d)
+        assert p.duration == d
+
+
+def test_minimax_h3_rejects_invalid_duration() -> None:
+    from pydantic import ValidationError
+
+    from src.models import MiniMaxH3Parameters
+
+    for d in (3, 16):
+        try:
+            MiniMaxH3Parameters(duration=d)
+            assert False, f"应拒绝 duration={d} (H3 范围 4-15)"
+        except ValidationError:
+            pass
+
+
+def test_minimax_h3_accepts_valid_ratios() -> None:
+    from src.models import MiniMaxH3Parameters
+
+    for r in ("adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"):
+        p = MiniMaxH3Parameters(ratio=r)
+        assert p.ratio == r
+
+
+def test_minimax_h3_rejects_invalid_ratio() -> None:
+    from pydantic import ValidationError
+
+    from src.models import MiniMaxH3Parameters
+
+    try:
+        MiniMaxH3Parameters(ratio="9:21")
+        assert False, "应拒绝 ratio=9:21 (H3 不支持)"
+    except ValidationError:
+        pass
+
+
+def test_minimax_h3_resolutions() -> None:
+    from pydantic import ValidationError
+
+    from src.models import MiniMaxH3Parameters
+
+    for r in ("768P", "2K"):
+        p = MiniMaxH3Parameters(resolution=r)
+        assert p.resolution == r
+
+    try:
+        MiniMaxH3Parameters(resolution="1080p")
+        assert False, "应拒绝 resolution=1080p (H3 仅 768P/2K)"
+    except ValidationError:
+        pass
+
+
+def test_minimax_h3_watermark_default_false() -> None:
+    from src.models import MiniMaxH3Parameters
+
+    p = MiniMaxH3Parameters()
+    assert p.watermark is False, "H3 应默认无水印"
+
+    p2 = MiniMaxH3Parameters(watermark=True)
+    assert p2.watermark is True
+
+
+def test_minimax_h3_request_full() -> None:
+    from src.models import (
+        MiniMaxH3Input,
+        MiniMaxH3Parameters,
+        MiniMaxH3Request,
+        SeedanceMedia,
+    )
+
+    req = MiniMaxH3Request(
+        input=MiniMaxH3Input(
+            prompt="test video",
+            media=[SeedanceMedia(type="reference_image", url="https://example.com/ref.png")],
+        ),
+        parameters=MiniMaxH3Parameters(
+            resolution="2K",
+            duration=8,
+            ratio="21:9",
+            watermark=False,
+        ),
+    )
+    dumped = req.model_dump(exclude_none=True)
+    assert dumped["model"] == "MiniMax-H3"
+    assert dumped["input"]["prompt"] == "test video"
+    assert dumped["input"]["media"][0]["type"] == "reference_image"
+    assert dumped["input"]["media"][0]["url"] == "https://example.com/ref.png"
+    assert dumped["parameters"]["resolution"] == "2K"
+    assert dumped["parameters"]["duration"] == 8
+    assert dumped["parameters"]["ratio"] == "21:9"
+    assert dumped["parameters"]["watermark"] is False
+
+
+def test_minimax_h3_first_frame_media() -> None:
+    from src.models import MiniMaxH3Input, SeedanceMedia
+
+    inp = MiniMaxH3Input(
+        prompt="animate this",
+        media=[SeedanceMedia(type="first_frame", url="https://example.com/f.png")],
+    )
+    dumped = inp.model_dump(exclude_none=True)
+    assert dumped["media"][0]["type"] == "first_frame"
+    assert "images" not in dumped

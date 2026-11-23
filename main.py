@@ -13,6 +13,9 @@ from src.models import (
     HappyHorseParameters,
     HappyHorseRequest,
     ImageRequest,
+    MiniMaxH3Input,
+    MiniMaxH3Parameters,
+    MiniMaxH3Request,
     QwenImageInput,
     QwenImageParameters,
     QwenImageRequest,
@@ -290,6 +293,70 @@ async def cmd_seedance_query(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_minimax_h3(args: argparse.Namespace) -> int:
+    settings = _build_settings()
+    if not settings.seedance_api_key:
+        print("[配置错误] SEEDANCE_API_KEY 未配置(MiniMax-H3 复用 scnet 计算服务 Key)", file=sys.stderr)
+        return 2
+
+    client = SeedanceClient(settings)
+    log = RunLog()
+
+    media: list[SeedanceMedia] | None = None
+    if args.image:
+        media = [SeedanceMedia(type="first_frame", url=args.image)]
+    if args.ref_image:
+        media = (media or []) + [SeedanceMedia(type="reference_image", url=args.ref_image)]
+    if args.ref_video:
+        media = (media or []) + [SeedanceMedia(type="reference_video", url=args.ref_video)]
+    if args.ref_audio:
+        media = (media or []) + [SeedanceMedia(type="reference_audio", url=args.ref_audio)]
+
+    media_types = {m.type for m in media or []}
+    if media_types & {"first_frame", "last_frame"} and media_types & {"reference_image", "reference_video", "reference_audio"}:
+        print("[参数错误] 首帧/尾帧与参考图/参考视频/参考音频互斥,不能混用", file=sys.stderr)
+        return 2
+
+    req = MiniMaxH3Request(
+        model="MiniMax-H3",
+        input=MiniMaxH3Input(prompt=args.prompt, media=media if media else None),
+        parameters=MiniMaxH3Parameters(
+            resolution=args.resolution,
+            duration=args.duration,
+            ratio=args.ratio,
+            watermark=args.watermark,
+        ),
+    )
+
+    out_path = Path(args.output)
+    _print(f"[minimax-h3] model=MiniMax-H3 duration={args.duration}s ratio={args.ratio} res={args.resolution}")
+    _print(f"[minimax-h3] prompt={args.prompt[:80]!r}")
+
+    def on_progress(status: str | None, pct: int | None) -> None:
+        _print(f"[minimax-h3] 状态={status}")
+
+    result = await client.generate_video(req, out_path, on_progress=on_progress)
+
+    video_url = result.output.results[0] if result.output and result.output.results else "unknown"
+    usage_info = ""
+    if result.usage and result.usage.video_duration:
+        usage_info = f"  时长={result.usage.video_duration}s"
+
+    _print(f"[minimax-h3] 已保存: {out_path}{usage_info}")
+    log.append("minimax_h3", {
+        "model": "MiniMax-H3",
+        "prompt": args.prompt[:100],
+        "duration": args.duration,
+        "ratio": args.ratio,
+        "resolution": args.resolution,
+    }, {
+        "path": str(out_path),
+        "video_url": video_url,
+        "task_id": result.output.task_id if result.output else None,
+    })
+    return 0
+
+
 async def cmd_wan(args: argparse.Namespace) -> int:
     settings = _build_settings()
     if not settings.seedance_api_key:
@@ -521,6 +588,21 @@ def cli() -> None:
     p_sq = sub.add_parser("seedance-query", help="查询 Seedance 任务状态")
     p_sq.add_argument("task_id", help="任务 ID")
     p_sq.set_defaults(func=cmd_seedance_query)
+
+    p_h3 = sub.add_parser("minimax-h3", help="MiniMax-H3 视频生成(文生/图生/多模态参考,scnet)")
+    p_h3.add_argument("prompt", help="视频内容描述")
+    p_h3.add_argument("--image", help="首帧(first_frame)图片 URL")
+    p_h3.add_argument("--ref-image", help="参考图(reference_image) URL,最多 9 张")
+    p_h3.add_argument("--ref-video", help="参考视频(reference_video) URL,最多 3 段")
+    p_h3.add_argument("--ref-audio", help="参考音频(reference_audio) URL,最多 3 段")
+    p_h3.add_argument("--ratio", default="16:9",
+                      choices=["adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+                      help="宽高比(文生视频必填且不能为 adaptive)")
+    p_h3.add_argument("--duration", type=int, default=5, help="视频时长(4-15秒)")
+    p_h3.add_argument("--resolution", default="2K", choices=["768P", "2K"], help="分辨率")
+    p_h3.add_argument("--watermark", action="store_true", help="包含 AIGC 水印")
+    p_h3.add_argument("--output", "-o", default="output/minimax_h3_video.mp4", help="保存路径")
+    p_h3.set_defaults(func=cmd_minimax_h3)
 
     p_hh = sub.add_parser("happyhorse", help="HappyHorse 文生视频(HappyHorse-1.0-T2V)")
     p_hh.add_argument("prompt", help="视频内容描述")

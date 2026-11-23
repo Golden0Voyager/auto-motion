@@ -303,3 +303,29 @@ class VideoQueryResponse(BaseModel):
     result_url: str | None = None
     remixed_from_video_id: str | None = None
     error: dict | None = None
+
+
+class MiniMaxH3Input(BaseModel):
+    prompt: str
+    images: list[str] | None = None
+    media: list[SeedanceMedia] | None = None
+
+
+class MiniMaxH3Parameters(BaseModel):
+    resolution: Literal["768P", "2K"] = "2K"
+    duration: int = 5
+    ratio: Literal["adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"] = "16:9"
+    watermark: bool = False
+
+    @field_validator("duration")
+    @classmethod
+    def validate_duration(cls, v: int) -> int:
+        if v < 4 or v > 15:
+            raise ValueError(f"duration 范围 4-15 秒, 得到 {v}")
+        return v
+
+
+class MiniMaxH3Request(BaseModel):
+    model: str = "MiniMax-H3"
+    input: MiniMaxH3Input
+    parameters: MiniMaxH3Parameters = Field(default_factory=MiniMaxH3Parameters)
