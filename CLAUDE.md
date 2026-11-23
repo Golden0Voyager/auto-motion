@@ -50,6 +50,7 @@ uv run python main.py happyhorse ...    # HappyHorse 视频生成(文生视频,�
 uv run python main.py wan ...           # 万相视频生成(文生视频,支持反向提示词/音频)
 uv run python main.py qwen ...          # 通义千问文生图(Qwen-Image-2.0)
 uv run python main.py seedance-query <task_id>  # 查询 Seedance/HappyHorse/Wan 任务
+uv run python main.py minimax-h3 ...  # MiniMax-H3 视频生成(文生/图生/多模态参考)
 uv run pytest tests/                 # 冒烟测试
 ```
 
@@ -62,13 +63,14 @@ uv run pytest tests/                 # 冒烟测试
 | `agnes-image-2.1-flash` | `POST /v1/images/generations` | `response_format` 必须放 `extra_body`;图生图用顶层 `image` |
 | `agnes-video-v2.0` | `POST /v1/videos` (异步) | `num_frames ≤ 441` 且满足 `8n+1`;`frame_rate 1-60` |
 
-### Seedance / HappyHorse / Wan (scnet.cn)
+### Seedance / HappyHorse / Wan / MiniMax-H3 (scnet.cn)
 
 | 模型 | 接口 | 关键约束 |
 |---|---|---|
 | `Seedance2.0` | `POST /videos/generations` (异步) | `duration 4-15秒`;支持文生视频/图生视频/多模态;ratio: adaptive/16:9/9:16 |
 | `HappyHorse-1.0-T2V` | `POST /videos/generations` (异步) | `duration 3-15秒`;纯文生视频;ratio: 9种(16:9/9:16/1:1/4:3/3:4/4:5/5:4/9:21/21:9) |
 | `Wan2.7-T2V` | `POST /videos/generations` (异步) | `duration 2-15秒`;支持 `negative_prompt`/`audio_url`/`prompt_extend`;ratio: 16:9/9:16 |
+| `MiniMax-H3` | `POST /videos/generations` (异步) | `duration 4-15秒`;`resolution` 仅 768P/2K;ratio: adaptive/21:9/16:9/4:3/1:1/3:4/9:16(文生视频必填且不能为 adaptive);首帧/尾帧与参考类媒体互斥;参考图≤9/参考视频≤3/参考音频≤3;复用 `SEEDANCE_API_KEY`/`SEEDANCE_BASE_URL` |
 | `Qwen-Image-2.0` | `POST /images/generations` (同步) | `size` 用 `宽*高`(如 `1024*1024`);`n` 1-6;`prompt_extend` 默认开;`watermark` 默认关;总像素 512²~2048² |
 
 详细参数与最佳实践见 `/Users/hainingyu/Code/docs/api/Agnes_AI_API_Report.md`。
